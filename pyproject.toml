@@ -1,0 +1,14 @@
+[project]
+name = "yfinance.tucano"
+version = "0.0.1"
+description = "A production-grade stock data importer and API for Brazilian B3 tickers."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "JoseLArantes" }
+]
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
