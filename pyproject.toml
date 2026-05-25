@@ -1,6 +1,6 @@
 [project]
 name = "yfinance.tucano"
-version = "0.0.1"
+version = "0.0.2"
 description = "A production-grade stock data importer and API for Brazilian B3 tickers."
 readme = "README.md"
 requires-python = ">=3.11"
