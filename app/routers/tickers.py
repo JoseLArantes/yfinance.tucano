@@ -538,8 +538,11 @@ def create_endpoint(endpoint_name: str):
 
     return get_ticker_field
 
-# Register all routes programmatically
-ALL_ENDPOINTS = sorted(list(set(ATTRIBUTES + METHODS)))
+# Register all routes programmatically (filtering out duplicates starting with get_)
+ALL_ENDPOINTS = sorted(list(set(
+    endpoint[4:] if endpoint.startswith("get_") else endpoint
+    for endpoint in (ATTRIBUTES + METHODS)
+)))
 
 for endpoint_name in ALL_ENDPOINTS:
     router.add_api_route(

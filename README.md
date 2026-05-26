@@ -10,7 +10,7 @@
 
 A production-grade, highly-performant REST API wrapper for `yfinance` built with **FastAPI**, **PostgreSQL** (via SQLAlchemy), and **Docker**.
 
-This service acts as an idempotent stock data importer and dynamic cache, offering **one REST endpoint per yfinance attribute and method** (over 90+ dynamically generated endpoints) mapped automatically and documented in the OpenAPI/Swagger interface.
+This service acts as an idempotent stock data importer and dynamic cache, offering **one REST endpoint per yfinance attribute and method** (over 50+ dynamically generated endpoints) mapped automatically and documented in the OpenAPI/Swagger interface.
 
 ---
 
@@ -103,11 +103,10 @@ Authorization: Bearer <your-api-token>
 | **GET** | `/api/v1/tickers` | List all unique imported tickers. |
 | **GET** | `/api/v1/tickers/{ticker}/historical` | Get paginated structured historical prices. |
 | **GET** | `/api/v1/tickers/{ticker}/info` | Retrieve the `info` attribute. |
-| **GET** | `/api/v1/tickers/{ticker}/get_info` | Alias method to retrieve `info`. |
 | **GET** | `/api/v1/tickers/{ticker}/balancesheet` | Alias to retrieve `balance_sheet`. |
 | **GET** | `/api/v1/tickers/{ticker}/option_chain` | Dynamic on-the-fly retrieval of option chains. |
 
-*(For a complete list of the 90+ endpoints and aliases, run the server and view `/docs`.)*
+*(For a complete list of the 50+ endpoints and aliases, run the server and view `/docs`.)*
 
 ---
 
@@ -161,51 +160,10 @@ Authorization: Bearer <your-api-token>
 
 ### Main methods
 
-- `get_actions()`
-- `get_analyst_price_targets()`
-- `get_balance_sheet()`
-- `get_balancesheet()`
-- `get_calendar()`
-- `get_capital_gains()`
-- `get_cash_flow()`
-- `get_cashflow()`
-- `get_dividends()`
-- `get_earnings()`
-- `get_earnings_dates()`
-- `get_earnings_estimate()`
-- `get_earnings_history()`
-- `get_eps_revisions()`
-- `get_eps_trend()`
-- `get_fast_info()`
-- `get_financials()`
-- `get_funds_data()`
-- `get_growth_estimates()`
-- `get_history_metadata()`
-- `get_income_stmt()`
-- `get_incomestmt()`
-- `get_info()`
-- `get_insider_purchases()`
-- `get_insider_roster_holders()`
-- `get_insider_transactions()`
-- `get_institutional_holders()`
-- `get_isin()`
-- `get_major_holders()`
-- `get_mutualfund_holders()`
-- `get_news()`
-- `get_option_chain()`
-- `get_recommendations()`
-- `get_recommendations_summary()`
-- `get_revenue_estimate()`
-- `get_sec_filings()`
-- `get_shares()`
-- `get_splits()`
-- `get_sustainability()`
-- `get_ttm_financials()`
-- `get_ttm_income_stmt()`
-- `get_upgrades_downgrades()`
-- `get_valuation()`
-- `history()`
-- `option_chain()`
+- `history`
+- `option_chain`
+
+*(Note: Methods and properties that are prefixed with `get_` in yfinance (e.g. `get_dividends()`, `get_income_stmt()`) are exposed as clean endpoints without the `get_` prefix (e.g. `/dividends`, `/income_stmt`) and use the HTTP GET method.)*
 
 ---
 
