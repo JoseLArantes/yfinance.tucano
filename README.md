@@ -6,7 +6,7 @@
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
 ![Helm](https://img.shields.io/badge/Helm-0F1626?style=for-the-badge&logo=helm&logoColor=white)
-[![API Status](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fyfinance.tucano.beakcloud.com%2Fhealth&query=%24.status&label=Tucano%20Release%20Status&style=for-the-badge&color=success)](https://yfinance.tucano.beakcloud.com/health)
+[![Swagger Hub](https://img.shields.io/badge/Swagger_Hub-85EA2D?style=for-the-badge&logo=swagger&logoColor=white)](https://portal.swaggerhub.com/apis/witbank/tucano-yfinance/1.0.0)
 
 A production-grade, highly-performant REST API wrapper for `yfinance` built with **FastAPI**, **PostgreSQL** (via SQLAlchemy), and **Docker**.
 
@@ -75,11 +75,14 @@ kubectl create secret docker-registry registry-cred \
 ```
 
 ### 2. Deploy Using Helm
+#### It is required Argo rollouts on the cluster
 Run the deployment command from the project root:
 ```bash
-helm upgrade --install tucano-yfinance deploy/helm/tucano-yfinance \
-  --namespace tucano-services \
-  --create-namespace
+kubectl create namespace tucano-services
+
+helm upgrade --install tucano-yfinance ./deploy/helm/tucano-yfinance \
+  -n tucano-services \
+  --set rollout.type=argo-rollout  
 ```
 
 ---
