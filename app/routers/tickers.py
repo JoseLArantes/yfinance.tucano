@@ -7,6 +7,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 import yfinance as yf
 import pandas as pd
+from deep_translator import GoogleTranslator
+
+def translate_info_fields(info: dict) -> dict:
+    """Translates the 'longBusinessSummary' from English to Portuguese using deep-translator."""
+    if not isinstance(info, dict):
+        return info
+    
+    summary = info.get("longBusinessSummary")
+    if isinstance(summary, str) and summary.strip():
+        try:
+            translated = GoogleTranslator(source="auto", target="pt").translate(summary)
+            if translated:
+                info["longBusinessSummary"] = translated
+        except Exception as e:
+            print(f"Error translating longBusinessSummary: {e}")
+            
+    return info
 
 from app.database import get_db
 from app.models import TickerRawData, HistoricalPrice, Ticker
@@ -143,10 +160,6 @@ def fetch_ticker_data(
     now = datetime.now()
 
     try:
-        # Delete existing data for clean ups (same behavior as SQLite REPLACE/DELETE)
-        db.query(HistoricalPrice).filter(HistoricalPrice.ticker == ticker).delete()
-        db.query(TickerRawData).filter(TickerRawData.ticker == ticker).delete()
-
         # Update or create the Ticker registry record (Idempotent, no duplicates)
         ticker_record = db.query(Ticker).filter(Ticker.ticker == ticker).first()
         if ticker_record:
@@ -155,66 +168,133 @@ def fetch_ticker_data(
             ticker_record = Ticker(ticker=ticker, sync_date=now)
             db.add(ticker_record)
 
-        # 1️⃣ Insert historical prices
-        historical_records = []
-        for date_val, row in hist.iterrows():
-            historical_records.append(
-                HistoricalPrice(
-                    ticker=ticker,
-                    date=date_val.date(),
-                    open=safe_float(row.get("Open")),
-                    high=safe_float(row.get("High")),
-                    low=safe_float(row.get("Low")),
-                    close=safe_float(row.get("Close")),
-                    volume=safe_float(row.get("Volume")),
-                    dividends=safe_float(row.get("Dividends")),
-                    stock_splits=safe_float(row.get("Stock Splits"))
-                )
-            )
-        db.bulk_save_objects(historical_records)
+        # 1️⃣ Insert / Update historical prices (Idempotent, update sync_date only on actual changes)
+        existing_prices = {
+            p.date: p for p in db.query(HistoricalPrice).filter(HistoricalPrice.ticker == ticker).all()
+        }
 
-        # 2️⃣ Insert other keys (flexible JSON)
+        visited_dates = set()
+        historical_records_count = 0
+        new_records = []
+        for date_val, row in hist.iterrows():
+            row_date = date_val.date()
+            visited_dates.add(row_date)
+            new_open = safe_float(row.get("Open"))
+            new_high = safe_float(row.get("High"))
+            new_low = safe_float(row.get("Low"))
+            new_close = safe_float(row.get("Close"))
+            new_volume = safe_float(row.get("Volume"))
+            new_dividends = safe_float(row.get("Dividends"))
+            new_splits = safe_float(row.get("Stock Splits"))
+
+            existing_p = existing_prices.get(row_date)
+            if existing_p:
+                is_changed = (
+                    existing_p.open != new_open or
+                    existing_p.high != new_high or
+                    existing_p.low != new_low or
+                    existing_p.close != new_close or
+                    existing_p.volume != new_volume or
+                    existing_p.dividends != new_dividends or
+                    existing_p.stock_splits != new_splits
+                )
+                if is_changed:
+                    existing_p.open = new_open
+                    existing_p.high = new_high
+                    existing_p.low = new_low
+                    existing_p.close = new_close
+                    existing_p.volume = new_volume
+                    existing_p.dividends = new_dividends
+                    existing_p.stock_splits = new_splits
+                    existing_p.sync_date = now
+            else:
+                new_record = HistoricalPrice(
+                    ticker=ticker,
+                    date=row_date,
+                    open=new_open,
+                    high=new_high,
+                    low=new_low,
+                    close=new_close,
+                    volume=new_volume,
+                    dividends=new_dividends,
+                    stock_splits=new_splits,
+                    sync_date=now
+                )
+                new_records.append(new_record)
+            historical_records_count += 1
+
+        if new_records:
+            db.bulk_save_objects(new_records)
+
+        # Delete database records that are no longer in yfinance history
+        for d, p in existing_prices.items():
+            if d not in visited_dates:
+                db.delete(p)
+
+        # 2️⃣ Insert / Update other keys (flexible JSON, update fetched_at only on actual changes)
+        existing_raw = {
+            r.data_key: r for r in db.query(TickerRawData).filter(TickerRawData.ticker == ticker).all()
+        }
+
         keys_saved = []
-        raw_records = []
+        visited_keys = set()
         for key in KEYS_TO_FETCH:
             try:
                 data = getattr(tk, key, None)
                 if callable(data):
                     data = data()
                 
+                if key == "info" and isinstance(data, dict):
+                    data = translate_info_fields(data)
+                
                 serializable = to_serializable(data)
                 if serializable is None or serializable == [] or serializable == {}:
                     continue
 
-                raw_records.append(
-                    TickerRawData(
+                visited_keys.add(key)
+                existing_r = existing_raw.get(key)
+                if existing_r:
+                    if existing_r.data_json != serializable:
+                        existing_r.data_json = serializable
+                        existing_r.fetched_at = now
+                else:
+                    new_raw = TickerRawData(
                         ticker=ticker,
                         data_key=key,
                         data_json=serializable,
                         fetched_at=now
                     )
-                )
+                    db.add(new_raw)
                 keys_saved.append(key)
             except Exception as e:
-                raw_records.append(
-                    TickerRawData(
+                error_json = {"_error": str(e)}
+                visited_keys.add(key)
+                existing_r = existing_raw.get(key)
+                if existing_r:
+                    if existing_r.data_json != error_json:
+                        existing_r.data_json = error_json
+                        existing_r.fetched_at = now
+                else:
+                    new_raw = TickerRawData(
                         ticker=ticker,
                         data_key=key,
-                        data_json={"_error": str(e)},
+                        data_json=error_json,
                         fetched_at=now
                     )
-                )
+                    db.add(new_raw)
                 keys_saved.append(key)
 
-        if raw_records:
-            db.bulk_save_objects(raw_records)
+        # Delete raw keys that are no longer present in yfinance response
+        for k, r in existing_raw.items():
+            if k not in visited_keys:
+                db.delete(r)
 
         db.commit()
 
         return TickerFetchResponse(
             ticker=ticker,
             keys_fetched=keys_saved,
-            historical_records_count=len(historical_records),
+            historical_records_count=historical_records_count,
             message=f"Successfully imported stock data for {ticker}",
             fetched_at=now,
             sync_date=now
@@ -402,7 +482,8 @@ def create_endpoint(endpoint_name: str):
                     "close": p.close,
                     "volume": p.volume,
                     "dividends": p.dividends,
-                    "stock_splits": p.stock_splits
+                    "stock_splits": p.stock_splits,
+                    "sync_date": p.sync_date.isoformat() if p.sync_date else None
                 }
                 for p in prices
             ]
@@ -428,6 +509,9 @@ def create_endpoint(endpoint_name: str):
             attr_val = getattr(tk, db_key, None)
             if callable(attr_val):
                 attr_val = attr_val()
+            
+            if db_key == "info" and isinstance(attr_val, dict):
+                attr_val = translate_info_fields(attr_val)
             
             serializable = to_serializable(attr_val)
             if serializable is not None and serializable != [] and serializable != {}:

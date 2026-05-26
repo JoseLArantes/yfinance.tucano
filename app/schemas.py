@@ -33,6 +33,7 @@ class HistoricalPriceResponse(BaseModel):
     volume: Optional[float] = None
     dividends: Optional[float] = None
     stock_splits: Optional[float] = None
+    sync_date: Optional[datetime] = None
 
 class TickerRawDataResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

@@ -15,7 +15,7 @@ class TickerRawData(Base):
     ticker = Column(String(20), primary_key=True, index=True)
     data_key = Column(String(50), primary_key=True)
     data_json = Column(JSONB, nullable=True)
-    fetched_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    fetched_at = Column(DateTime(timezone=True), default=func.now())
 
 class HistoricalPrice(Base):
     __tablename__ = "historical_prices"
@@ -29,6 +29,7 @@ class HistoricalPrice(Base):
     volume = Column(Float, nullable=True)
     dividends = Column(Float, nullable=True)
     stock_splits = Column(Float, nullable=True)
+    sync_date = Column(DateTime(timezone=True), default=func.now())
 
 class ApiUser(Base):
     __tablename__ = "api_users"
