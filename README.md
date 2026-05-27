@@ -85,6 +85,15 @@ helm upgrade --install tucano-yfinance ./deploy/helm/tucano-yfinance \
   --set rollout.type=argo-rollout  
 ```
 
+Check scheduler Job on K8s
+> run every day at 00:00
+```
+kubectl get pods -n tucano-services -l app.kubernetes.io/component=scheduler
+kubectl logs -l app.kubernetes.io/component=scheduler --tail=50 -f
+```
+
+Start manual scheduled sync:
+`kubectl create job --from=cronjob/tucano-yfinance-scheduler manual-sync-run`
 ---
 
 ## API Usage & Endpoints
@@ -157,13 +166,6 @@ Authorization: Bearer <your-api-token>
 - `ttm_income_stmt` (alias: `ttm_incomestmt`)
 - `upgrades_downgrades`
 - `valuation`
-
-### Main methods
-
-- `history`
-- `option_chain`
-
-*(Note: Methods and properties that are prefixed with `get_` in yfinance (e.g. `get_dividends()`, `get_income_stmt()`) are exposed as clean endpoints without the `get_` prefix (e.g. `/dividends`, `/income_stmt`) and use the HTTP GET method.)*
 
 ---
 

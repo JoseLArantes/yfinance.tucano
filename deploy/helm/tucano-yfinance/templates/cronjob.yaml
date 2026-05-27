@@ -1,0 +1,53 @@
+{{- if .Values.scheduler.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "tucano-yfinance.fullname" . }}-scheduler
+  labels:
+    {{- include "tucano-yfinance.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.scheduler.schedule | quote }}
+  concurrencyPolicy: {{ .Values.scheduler.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.scheduler.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.scheduler.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "tucano-yfinance.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: scheduler
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          restartPolicy: OnFailure
+          containers:
+            - name: scheduler
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["python", "-m", "app.scheduler"]
+              env:
+                - name: API_URL
+                  value: "http://{{ include "tucano-yfinance.fullname" . }}:{{ .Values.service.port }}"
+                - name: SYNC_PERIOD
+                  value: {{ .Values.scheduler.period | quote }}
+                - name: SYNC_RAW
+                  value: {{ .Values.scheduler.syncRaw | quote }}
+                {{- range $key, $val := .Values.env }}
+                {{- if ne $key "PORT" }}
+                - name: {{ $key }}
+                  value: {{ $val | quote }}
+                {{- end }}
+                {{- end }}
+                {{- range $key, $val := .Values.secretEnv }}
+                - name: {{ $key }}
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $val.secretName }}
+                      key: {{ $val.secretKey }}
+                {{- end }}
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}
+{{- end }}

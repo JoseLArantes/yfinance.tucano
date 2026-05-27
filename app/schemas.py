@@ -57,3 +57,18 @@ class ApiUserResponse(BaseModel):
 class TokenRequest(BaseModel):
     username: str = Field(..., description="The username")
     password: str = Field(..., description="The password (which is the user's token)")
+
+
+class SyncedTickerInfo(BaseModel):
+    ticker: str
+    historical_records_count: int
+    keys_fetched_count: int
+
+class FailedTickerInfo(BaseModel):
+    ticker: str
+    error: str
+
+class TickerSyncResponse(BaseModel):
+    message: str
+    synced_tickers: List[SyncedTickerInfo]
+    failed_tickers: List[FailedTickerInfo]
